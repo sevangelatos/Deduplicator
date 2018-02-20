@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import os
 import stat
 import sys
@@ -27,6 +28,24 @@ def sha1(filename):
         block = f.read(read_blocksize)
     return h.digest()
 
+##def normalized_extension(filename):
+##    ext = os.path.splitext(filename)[1].upper()
+##    if ext == ".JPEG":
+##        return ".JPG"
+##    elif ext == ".MPEG":
+##        return ".MPG"
+##    elif ext == ".TIFF":
+##        return ".TIF"
+##    elif ext == ".HTM":
+##        return ".HTML"
+##    elif ext == ".AIFF":
+##        return ".AIF"
+##    elif ext == ".MIDI":
+##        return ".MID"
+##    else:
+##        return ext
+##    
+##
 ##def identical(f1, f2):
 ##    try:
 ##        f1 = open(f2, "rb")
@@ -59,7 +78,7 @@ def group_by_size():
             by_size[size] = [info]
     return [item for item in by_size.values() if len(item) > 1 ]
 
-def group_identical(files, onlyhash = True):
+def group_identical(files):
     by_inode = {}
     for f in files:
         inode = f.stat.st_ino
@@ -95,16 +114,17 @@ def listing_print(l):
 def hardlink(src, dest):
     if src.stat.st_dev != dest.stat.st_dev:
         print("{} and {} are not on the same device"\
-            .format(src.filename, dest.filename))
+            .format(src.filename, dest.filename), file=sys.stderr)
         return False
 
     try:
         backup = dest.filename + ".bak"
         os.rename(dest.filename, backup)
+        print("linking...\n{} to \n{}".format(src.filename, dest.filename))
         os.link(src.filename, dest.filename)
         os.unlink(backup)
     except Exception as ex:
-        print(ex)
+        print(ex, file=sys.stderr)
         return False
     return True
 
@@ -131,22 +151,21 @@ def make_hardlinks(files):
         if inode == best_inode:
             continue
         for f in by_inode[inode]:
-            hardlink(master, f)
-            
-    # for each of the files with inode != best_inode
-        # rm (unlink?) file
-        # Link file with the best_inode (master) file
-
+            if not hardlink(master, f):
+                print("Could not hardlink {} to {} ...skipping"\
+                      .format(master.filename, f.filename), file=sys.stderr)
+                
+                
 
 def system(cmd, params):
     ex = cmd.split()[0]
     status = os.spawnvp(os.P_WAIT, ex, cmd.split()+params)
     if (status == 127):
-        raise ChildProcessError("Could not execute: " + ex)
+        raise ChildProcessError("Could not execute: " + ex, file=sys.stderr)
     return status
 
 def print_help():
-    print('Usage: dupes [--exec command | --hardlink]')
+    print('Usage: dupes [--exec command | --hardlink]', file=sys.stderr)
     
 
 #parse parameters
