@@ -77,7 +77,7 @@ def group_identical(files, onlyhash = True):
             h = sha1(by_inode[inode][0].filename)
         except IOError:
             sys.stderr.write("Could not get signature for " +
-                             fname + " skipping...\n")
+                             by_inode[inode][0].filename + " skipping...\n")
             continue
         if h in by_hash:
             by_hash[h] = by_hash[h] + by_inode[inode]
@@ -89,7 +89,7 @@ def group_identical(files, onlyhash = True):
 def listing_print(l):
     print('')
     for i in l:
-        print(i.filename)
+        print("{} {} {}".format(i.stat.st_nlink, i.stat.st_ino, i.filename))
     print('')
 
 def hardlink(src, dest):
