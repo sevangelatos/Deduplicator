@@ -36,10 +36,9 @@ def fast_hash(filename):
     h.update(block)
     return h.digest()
 
-def group_by_size():
+def group_by_size(filenames):
     by_size = {}
-    for fname in sys.stdin.readlines():
-        fname = fname[:-1] #discard newline
+    for fname in filenames:
         try:
             info = file_info(fname)
         except OSError:
@@ -148,6 +147,12 @@ def system(cmd, params):
 def print_help():
     print('Usage: dupes [--exec command | --hardlink]', file=sys.stderr)
     
+def filenames_stdin():
+    stream = sys.stdin
+    if sys.version_info[0] >= 3:
+        stream = sys.stdin.buffer
+    for fname in stream.readlines():
+        yield fname[:-1] #discard newline
 
 #parse parameters
 try:
@@ -166,7 +171,8 @@ elif optlist:
     cmd = optlist[0][1]
     action = lambda params: system(cmd, params)
 
-for same_size in group_by_size():
+
+for same_size in group_by_size( filenames_stdin() ):
     for same_fhash in group_by_hash(same_size, fast_hash):
         for identical in group_identical(same_fhash):
             # Don't do anything for lonely files
