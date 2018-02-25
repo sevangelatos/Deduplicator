@@ -8,6 +8,13 @@ import getopt
 
 read_blocksize = 16*1024
 
+fsencode = lambda x:x
+fsdecode = lambda x:x
+
+if sys.version_info[0] >= 3:
+    fsencode = os.fsencode
+    fsdecode = os.fsdecode
+
 class file_info(object):
     def __init__(self, f):
         self.filename = f
@@ -42,7 +49,7 @@ def group_by_size(filenames):
         try:
             info = file_info(fname)
         except OSError:
-            sys.stderr.write("Could not stat " + fname + " skipping...\n")
+            sys.stderr.write("Could not stat " + fsdecode(fname) + " skipping...\n")
             continue
         if not info.regular_file():
             continue
@@ -89,19 +96,19 @@ def group_identical(files):
 def listing_print(l):
     print('')
     for i in l:
-        print("{} {} {}".format(i.stat.st_nlink, i.stat.st_ino, i.filename))
+        print("{} {} {}".format(i.stat.st_nlink, i.stat.st_ino, fsdecode(i.filename)))
     print('')
 
 def hardlink(src, dest):
     if src.stat.st_dev != dest.stat.st_dev:
         print("{} and {} are not on the same device"\
-            .format(src.filename, dest.filename), file=sys.stderr)
+            .format(fsdecode(src.filename), fsdecode(dest.filename)), file=sys.stderr)
         return False
 
     try:
-        backup = dest.filename + ".bak"
+        backup = dest.filename + fsencode(".bak")
         os.rename(dest.filename, backup)
-        print("linking...\n{} to \n{}".format(src.filename, dest.filename))
+        print("linking...\n{} to \n{}".format(fsdecode(src.filename), fsdecode(dest.filename)))
         os.link(src.filename, dest.filename)
         os.unlink(backup)
     except Exception as ex:
@@ -134,14 +141,15 @@ def make_hardlinks(files):
         for f in by_inode[inode]:
             if not hardlink(master, f):
                 print("Could not hardlink {} to {} ...skipping"\
-                      .format(master.filename, f.filename), file=sys.stderr)
+                      .format(fsdecode(master.filename), fsdecode(f.filename)), file=sys.stderr)
 
 
 def system(cmd, params):
-    ex = cmd.split()[0]
-    status = os.spawnvp(os.P_WAIT, ex, cmd.split()+params)
+    command = [fsencode(i) for i in cmd.split()]
+    ex = command[0]
+    status = os.spawnvp(os.P_WAIT, ex, command + [i.filename for i in params])
     if (status == 127):
-        raise ChildProcessError("Could not execute: " + ex, file=sys.stderr)
+        raise ChildProcessError("Could not execute: " + fsdecode(ex))
     return status
 
 def print_help():
