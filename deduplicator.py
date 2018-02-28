@@ -70,24 +70,21 @@ def group_by(files, key):
 
     
 def group_by_hash(files, hash_function):
-    by_inode = group_by_inode(files)
-    if len(by_inode) <= 1:
-        return [files] if len(files)>1 else []
+    by_dev_inode = group_by(files, lambda f: (f.stat.st_ino, f.stat.st_dev)).values()
+    # If they're all the same inode, no need to calculate hashes at all.
+    if len(by_dev_inode) <= 1:
+        return [files]
 
     by_hash = {}
-    for inode in by_inode:
+    for same_inode in by_dev_inode:
         try:
-            h = hash_function(by_inode[inode][0].filename)
+            h = hash_function(same_inode[0].filename)
+            by_hash.setdefault(h, []).extend(same_inode)
         except IOError:
             sys.stderr.write("Could not get hash for " +
-                             by_inode[inode][0].strname() + " skipping...\n")
-            continue
-        if h in by_hash:
-            by_hash[h] = by_hash[h] + by_inode[inode]
-        else:
-            by_hash[h] = by_inode[inode]
-    
-    return [files for files in by_hash.values() if len(files) > 1]
+                             same_inode[0].strname() + " skipping...\n")
+
+    return by_hash.values()
 
 def listing_print(files):
     print('')
@@ -95,37 +92,42 @@ def listing_print(files):
         print("{} {} {}".format(f.stat.st_nlink, f.stat.st_ino, f.strname()) )
     print('')
 
-def hardlink(src, dest):
-    if src.stat.st_dev != dest.stat.st_dev:
-        print("{} and {} are not on the same device"\
-            .format(src.strname(), dest.strname()), file=sys.stderr)
-        return False
-
-    try:
+def hardlink(src, dest, dry_run):
+    "Make dest a hardlink to the src"
+    assert src.stat.st_dev == dest.stat.st_dev
+    print("linking...\n{} to \n{}".format(src.strname(), dest.strname()))
+    if not dry_run:
         backup = dest.filename + fsencode(".bak")
         os.rename(dest.filename, backup)
-        print("linking...\n{} to \n{}".format(src.strname(), dest.strname()))
         os.link(src.filename, dest.filename)
         os.unlink(backup)
-    except Exception as ex:
-        print(ex, file=sys.stderr)
-        return False
-    return True
+        
+    return dest.stat.st_size
     
-def make_hardlinks(files):
-    by_inode = group_by_inode(files)
+def make_hardlinks_within_device(files, dry_run):
+    by_inode = group_by(files, lambda f: f.stat.st_ino)
     # If there are no files or all files are hardlinked with eachother...
     if len(by_inode) <= 1:
-        return
-
+        return 0
+    
+    bytes_hardlinked = 0
     master = max(files, key=lambda f: f.stat.st_nlink)
     for inode in by_inode:
         if inode == master.stat.st_ino:
             continue
         for f in by_inode[inode]:
-            if not hardlink(master, f):
-                print("Could not hardlink {} to {} ...skipping"\
-                      .format(master.strname(), f.strname()), file=sys.stderr)
+            try:
+                bytes_hardlinked += hardlink(master, f, dry_run)
+            except Exception as ex:
+                print("{}: Could not hardlink {} to {} ...skipping"\
+                      .format(ex, master.strname(), f.strname()), file=sys.stderr)
+    return bytes_hardlinked
+
+def make_hardlinks(files, dry_run):
+    bytes_hardlinked = 0
+    for files in filter_solo(group_by_dev(files)):
+        bytes_hardlinked += make_hardlinks_within_device(files, dry_run)
+    return bytes_hardlinked
 
 def system(cmd, params):
     command = [fsencode(i) for i in cmd.split()]
@@ -141,14 +143,11 @@ def group_by_size(files):
 def group_by_dev(files):
     return group_by(files, lambda f: f.stat.st_dev).values()
 
-def group_by_inode(files):
-    return group_by(files, lambda f: f.stat.st_ino)
-    
 def filter_solo(items_list):
     return (i for i in items_list if len(i) > 1)
 
 def print_help():
-    print('Usage: dupes [--exec command | --hardlink] [-0]', file=sys.stderr)
+    print('Usage: dupes [--exec command | --hardlink] [-0] [--dry-run]', file=sys.stderr)
     
 def read_filenames(stream, separator = b"\n"):
         buff = stream.read(read_blocksize)
@@ -181,25 +180,36 @@ class Options(object):
         self.action = listing_print # Sction on duplicates
         self.separator = b'\n'      # Files separator
         self.dry_run = False        # Dry run only
+        self.count_bytes = False    # Do not count bytes
         
         for opt in optlist:
             if opt[0] == '--hardlink':
                 self.action = make_hardlinks
+                self.count_bytes = True
             if opt[0] == "--exec":
                 self.action = lambda params: system(opt[1], params)
             if opt[0] == "--dry-run":
                 self.dry_run = True
             if opt[0] == "-0":
                 self.separator = b'\0'
+        
+        if self.action is make_hardlinks:
+            self.action = lambda files: make_hardlinks(files, self.dry_run)
 
 def main():
     opts = Options()
     opts.parse()
     
+    total_bytes = 0
     for same_size in filter_solo( group_by_size( stat_files(read_filenames(stream, opts.separator)) )):
         for same_fhash in filter_solo( group_by_hash(same_size, fast_hash)):
             for identical in filter_solo( group_by_hash(same_fhash, sha1)):
-                opts.action(identical)
+                val = opts.action(identical)
+                if opts.count_bytes:
+                    total_bytes += val
+    
+    if opts.count_bytes:
+        print( "{:.1f}Kbytes saved by hardlinking".format(total_bytes/1024.0) )
 
 if __name__ == "__main__":
     main()
