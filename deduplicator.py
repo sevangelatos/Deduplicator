@@ -203,6 +203,7 @@ def main():
     
     if opts.count_bytes:
         print( "{:.1f}Kbytes saved by hardlinking".format(total_bytes/1024.0) )
+    return 0
 
 if __name__ == "__main__":
     main()
