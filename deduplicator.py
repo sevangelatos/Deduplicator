@@ -35,10 +35,9 @@ def sha1(filename):
     "Comprehensive SHA1 hash of entire file"
     h = hashlib.sha1()
     with open(filename, 'rb') as f:
-        block = f.read(read_blocksize)
-        while block:
+        read = lambda :f.read(read_blocksize)
+        for block in iter(read, b''):
             h.update(block)
-            block = f.read(read_blocksize)
     return h.digest()
 
 def fast_hash(filename):
@@ -146,13 +145,10 @@ def group_by_dev(files):
 def filter_solo(items_list):
     return (i for i in items_list if len(i) > 1)
 
-def print_help():
-    print('Usage: dupes [--exec command | --hardlink] [-0] [--dry-run]', file=sys.stderr)
-    
 def read_filenames(stream, separator = b"\n"):
-        buff = stream.read(read_blocksize)
+        read = lambda : stream.read(read_blocksize)
         remain = b""
-        while buff:
+        for buff in iter(read, b''):
             tokens = (remain + buff).split(separator)
             remain = b""
             # Keep remainder bytes if needed...
@@ -161,20 +157,19 @@ def read_filenames(stream, separator = b"\n"):
 
             for tok in tokens:
                 if tok: yield tok
-            buff = stream.read(read_blocksize)
         if remain:
             yield remain
 
 class Options(object):
     "Holds script options"
-    def parse(self):
+    def __init__(self):
         "Initialize options from command line"
         try:
             optlist, args = getopt.getopt(sys.argv[1:], '0', ['exec=', 'hardlink', 'dry-run'])
             if args:
                 raise RuntimeError(str(args))
         except:
-            print_help()
+            print('Usage: dupes [--exec command | --hardlink] [-0] [--dry-run]', file=sys.stderr)
             sys.exit(1)
         
         self.action = listing_print # Sction on duplicates
@@ -198,8 +193,6 @@ class Options(object):
 
 def main():
     opts = Options()
-    opts.parse()
-    
     total_bytes = 0
     for same_size in filter_solo( group_by_size( stat_files(read_filenames(stream, opts.separator)) )):
         for same_fhash in filter_solo( group_by_hash(same_size, fast_hash)):
@@ -213,3 +206,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
