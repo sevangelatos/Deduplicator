@@ -6,6 +6,7 @@ import sys
 import hashlib
 import getopt
 import subprocess
+from collections import defaultdict
 
 read_blocksize = 16 * 1024
 
@@ -74,9 +75,9 @@ def stat_files(filenames):
 
 def group_by(files, key):
     """Group files by key function"""
-    by_group = {}
+    by_group = defaultdict(list)
     for f in files:
-        by_group.setdefault(key(f), []).append(f)
+        by_group[key(f)].append(f)
     return by_group
 
 
@@ -90,11 +91,11 @@ def group_by_hash(files, hash_function):
     if len(by_dev_inode) <= 1:
         return [files]
 
-    by_hash = {}
+    by_hash = defaultdict(list)
     for same_inode in by_dev_inode:
         try:
             h = hash_function(same_inode[0].filename)
-            by_hash.setdefault(h, []).extend(same_inode)
+            by_hash[h].extend(same_inode)
         except IOError:
             sys.stderr.write("Could not get hash for " +
                              same_inode[0] + " skipping...\n")
