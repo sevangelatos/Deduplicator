@@ -223,20 +223,40 @@ class Options(object):
             self.action = lambda files: make_hardlinks(files, self.dry_run)
 
 
+def group_compose(data, functions):
+    """Group of data successively, based on the provided groupping functions"""
+    for f in functions:
+        newdata = []
+        for d in (f(i) for i in data):
+            newdata.extend(filter_solo(d))  # After each groupping, filter
+        data = newdata
+    return data
+
+
+def deduplicate(filenames):
+    """Deduplicate files and yield groups of identical FileInfo objects"""
+    # Apply successive groupping functions
+    functions = [
+        group_by_size,
+        lambda x: group_by_hash(x, fast_hash),
+        lambda x: group_by_hash(x, sha1)
+    ]
+    # All files start in one group of FileInfo objects
+    all_files = [stat_files(filenames)]
+
+    for group in group_compose(all_files, functions):
+        yield group
+
+
 def main():
     opts = Options()
     total_bytes = 0
-    for same_size in filter_solo(
-        group_by_size(
-            stat_files(
-            read_filenames(
-                stream,
-                opts.separator)))):
-        for same_fhash in filter_solo(group_by_hash(same_size, fast_hash)):
-            for identical in filter_solo(group_by_hash(same_fhash, sha1)):
-                val = opts.action(identical)
-                if opts.count_bytes:
-                    total_bytes += val
+    filenames = read_filenames(stream, opts.separator)
+    
+    for group in deduplicate(filenames):
+        val = opts.action(group)
+        if opts.count_bytes:
+            total_bytes += val
 
     if opts.count_bytes:
         print("{:.1f}Kbytes saved by hardlinking".format(total_bytes / 1024.0))
