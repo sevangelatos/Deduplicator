@@ -63,15 +63,13 @@ def stat_files(filenames):
     for fname in filenames:
         try:
             info = FileInfo(fname)
+            if info.regular_file() and info.stat.st_size:
+                yield info
         except OSError:
             sys.stderr.write(
                 "Could not stat " +
                 fsdecode(fname) +
                 " skipping...\n")
-            continue
-        if not info.regular_file() or info.stat.st_size == 0:
-            continue
-        yield info
 
 
 def group_by(files, key):
