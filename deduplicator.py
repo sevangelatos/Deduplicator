@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 from __future__ import print_function
+from collections import defaultdict
+from functools import partial
 import os
 import stat
 import sys
 import hashlib
 import getopt
 import subprocess
-from collections import defaultdict
-
-read_blocksize = 16 * 1024
 
 
 def fsencode(x):
@@ -40,12 +39,17 @@ class FileInfo(object):
         return fsdecode(self.filename)
 
 
+def read_chunk(stream):
+    """Read at most a chunk from a stream"""
+    chunk_size = 16 * 1024
+    return stream.read(chunk_size)
+
+
 def sha1(filename):
     """Comprehensive SHA1 hash of entire file"""
     h = hashlib.sha1()
     with open(filename, 'rb') as f:
-        def read(): return f.read(read_blocksize)
-        for block in iter(read, b''):
+        for block in iter(partial(read_chunk, f), b''):
             h.update(block)
     return h.digest()
 
@@ -54,7 +58,7 @@ def fast_hash(filename):
     """Quick MD5 hash of first block only"""
     h = hashlib.md5()
     with open(filename, 'rb') as f:
-        block = f.read(read_blocksize)
+        block = read_chunk(f)
         h.update(block)
     return h.digest()
 
@@ -168,9 +172,9 @@ def filter_solo(items_list):
     return (i for i in items_list if len(i) > 1)
 
 
-def read_filenames(stream, separator=b"\n"):
+def read_filenames(stream, separator):
     remain = b""
-    for buff in iter(lambda: stream.read(read_blocksize), b''):
+    for buff in iter(partial(read_chunk, stream), b''):
         tokens = (remain + buff).split(separator)
         remain = b""
         # Keep remainder bytes if needed...
