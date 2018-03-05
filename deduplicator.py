@@ -5,6 +5,7 @@ import stat
 import sys
 import hashlib
 import getopt
+import subprocess
 
 read_blocksize = 16 * 1024
 
@@ -153,11 +154,7 @@ def make_hardlinks(files, dry_run):
 
 def system(cmd, params):
     command = [fsencode(i) for i in cmd.split()]
-    ex = command[0]
-    status = os.spawnvp(os.P_WAIT, ex, command + [i.filename for i in params])
-    if status == 127:
-        raise ChildProcessError("Could not execute: " + fsdecode(ex))
-    return status
+    return subprocess.call(command + [i.filename for i in params])
 
 
 def group_by_size(files):
