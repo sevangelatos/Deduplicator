@@ -24,7 +24,7 @@ if sys.version_info[0] >= 3:
 
 
 class FileInfo(object):
-    "Filename and stat information "
+    """Filename and stat file information"""
 
     def __init__(self, f):
         self.filename = f
@@ -39,7 +39,7 @@ class FileInfo(object):
 
 
 def sha1(filename):
-    "Comprehensive SHA1 hash of entire file"
+    """Comprehensive SHA1 hash of entire file"""
     h = hashlib.sha1()
     with open(filename, 'rb') as f:
         def read(): return f.read(read_blocksize)
@@ -49,7 +49,7 @@ def sha1(filename):
 
 
 def fast_hash(filename):
-    "Quick MD5 hash of first block only"
+    """Quick MD5 hash of first block only"""
     h = hashlib.md5()
     with open(filename, 'rb') as f:
         block = f.read(read_blocksize)
@@ -58,7 +58,7 @@ def fast_hash(filename):
 
 
 def stat_files(filenames):
-    "Produce FileInfo for all non-empty files"
+    """Produce FileInfo for all non-empty files"""
     for fname in filenames:
         try:
             info = FileInfo(fname)
@@ -74,7 +74,7 @@ def stat_files(filenames):
 
 
 def group_by(files, key):
-    "Group files by key function"
+    """Group files by key function"""
     by_group = {}
     for f in files:
         by_group.setdefault(key(f), []).append(f)
@@ -104,14 +104,14 @@ def group_by_hash(files, hash_function):
 
 
 def listing_print(files):
-    print('')
+    print()
     for f in files:
         print("{} {} {}".format(f.stat.st_nlink, f.stat.st_ino, f.strname()))
-    print('')
+    print()
 
 
 def hardlink(src, dest, dry_run):
-    "Make dest a hardlink to the src"
+    """Make dest a hardlink to the src"""
     assert src.stat.st_dev == dest.stat.st_dev
     print("linking...\n{} to \n{}".format(src.strname(), dest.strname()))
     if not dry_run:
@@ -189,18 +189,18 @@ def read_filenames(stream, separator=b"\n"):
 
 
 class Options(object):
-    "Holds script options"
+    """Holds script options"""
 
     def __init__(self):
-        "Initialize options from command line"
+        """Initialize options from command line"""
         try:
             optlist, args = getopt.getopt(
-                sys.argv[1:], '0', ['exec=', 'hardlink', 'dry-run'])
+                sys.argv[1:], "0", ["exec=", "hardlink", "dry-run"])
             if args:
                 raise RuntimeError(str(args))
         except BaseException:
-            print('Usage: dupes [--exec command | --hardlink]'
-                  ' [-0] [--dry-run]', file=sys.stderr)
+            print("Usage: dupes [--exec command | --hardlink]"
+                  " [-0] [--dry-run]", file=sys.stderr)
             sys.exit(1)
 
         self.action = listing_print  # Sction on duplicates
@@ -209,7 +209,7 @@ class Options(object):
         self.count_bytes = False    # Do not count bytes
 
         for opt in optlist:
-            if opt[0] == '--hardlink':
+            if opt[0] == "--hardlink":
                 self.action = make_hardlinks
                 self.count_bytes = True
             if opt[0] == "--exec":
