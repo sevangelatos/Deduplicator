@@ -35,7 +35,7 @@ class FileInfo(object):
         mode = self.stat[stat.ST_MODE]
         return stat.S_ISREG(mode) and not stat.S_ISLNK(mode)
 
-    def strname(self):
+    def __str__(self):
         return fsdecode(self.filename)
 
 
@@ -99,7 +99,7 @@ def group_by_hash(files, hash_function):
             by_hash.setdefault(h, []).extend(same_inode)
         except IOError:
             sys.stderr.write("Could not get hash for " +
-                             same_inode[0].strname() + " skipping...\n")
+                             same_inode[0] + " skipping...\n")
 
     return by_hash.values()
 
@@ -107,14 +107,14 @@ def group_by_hash(files, hash_function):
 def listing_print(files):
     print()
     for f in files:
-        print("{} {} {}".format(f.stat.st_nlink, f.stat.st_ino, f.strname()))
+        print("{} {} {}".format(f.stat.st_nlink, f.stat.st_ino, f))
     print()
 
 
 def hardlink(src, dest, dry_run):
     """Make dest a hardlink to the src"""
     assert src.stat.st_dev == dest.stat.st_dev
-    print("linking...\n{} to \n{}".format(src.strname(), dest.strname()))
+    print("linking...\n{} to \n{}".format(src, dest))
     if not dry_run:
         backup = dest.filename + fsencode(".bak")
         os.rename(dest.filename, backup)
@@ -140,7 +140,7 @@ def make_hardlinks_within_device(files, dry_run):
                 bytes_hardlinked += hardlink(master, f, dry_run)
             except Exception as ex:
                 print("{}: Could not hardlink {} to {} ...skipping"
-                      .format(ex, master.strname(), f.strname()),
+                      .format(ex, master, f),
                       file=sys.stderr)
     return bytes_hardlinked
 
