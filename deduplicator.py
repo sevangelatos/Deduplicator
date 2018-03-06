@@ -71,10 +71,8 @@ def stat_files(filenames):
             if info.regular_file() and info.stat.st_size:
                 yield info
         except OSError:
-            sys.stderr.write(
-                "Could not stat " +
-                fsdecode(fname) +
-                " skipping...\n")
+            print("Could not stat {} skipping..."
+                  .format(fsdecode(fname)), file=sys.stderr)
 
 
 def group_by(files, key):
@@ -101,8 +99,8 @@ def group_by_hash(files, hash_function):
             h = hash_function(same_inode[0].filename)
             by_hash[h].extend(same_inode)
         except IOError:
-            sys.stderr.write("Could not get hash for " +
-                             same_inode[0] + " skipping...\n")
+            print("Could not get hash for {} skipping..."
+                  .format(same_inode[0]), file=sys.stderr)
 
     return by_hash.values()
 
@@ -203,7 +201,7 @@ class Options(object):
                   " [-0] [--dry-run]", file=sys.stderr)
             sys.exit(1)
 
-        self.action = listing_print  # Sction on duplicates
+        self.action = listing_print  # Action on duplicates
         self.separator = b'\n'      # Files separator
         self.dry_run = False        # Dry run only
         self.count_bytes = False    # Do not count bytes
@@ -252,7 +250,7 @@ def main():
     opts = Options()
     total_bytes = 0
     filenames = read_filenames(stream, opts.separator)
-    
+
     for group in deduplicate(filenames):
         val = opts.action(group)
         if opts.count_bytes:
